@@ -2,7 +2,23 @@
   "import": [
     {
       "path": "username/dns_checker",
-      "alias": "dns"
+      "alias": "lib"
+    },
+    {
+      "path": "username/dns_checker/src/spf",
+      "alias": "spf"
+    },
+    {
+      "path": "username/dns_checker/src/dmarc",
+      "alias": "dmarc"
+    },
+    {
+      "path": "username/dns_checker/src/dkim",
+      "alias": "dkim"
+    },
+    {
+      "path": "username/dns_checker/src/mx",
+      "alias": "mx"
     },
     "moonbitlang/async"
   ],

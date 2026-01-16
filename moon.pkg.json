@@ -1,5 +1,2 @@
 {
-  "import": [
-    "moonbitlang/async/process"
-  ]
 }

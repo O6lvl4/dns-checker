@@ -1,0 +1,8 @@
+{
+  "import": [
+    {
+      "path": "username/dns_checker/src/dns",
+      "alias": "dns"
+    }
+  ]
+}
