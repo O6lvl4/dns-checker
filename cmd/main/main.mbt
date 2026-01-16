@@ -4,6 +4,9 @@ fn print_usage() -> Unit {
   println("")
   println("Comprehensive DNS record checker (RFC compliant)")
   println("")
+  println("Options:")
+  println("  --all, -a    Show all checks including unconfigured (SKIP)")
+  println("")
   println("Checks performed:")
   println("  Basic:")
   println("    - A/AAAA records (IPv4/IPv6)")
@@ -59,9 +62,23 @@ async fn main {
     return
   }
 
-  let domain = args[1]
+  // Parse arguments
+  let mut domain = ""
+  let mut show_all = false
 
-  if domain == "--help" || domain == "-h" {
+  for i in 1..<args.length() {
+    let arg = args[i]
+    if arg == "--all" || arg == "-a" {
+      show_all = true
+    } else if arg == "--help" || arg == "-h" {
+      print_usage()
+      return
+    } else if domain.is_empty() {
+      domain = arg
+    }
+  }
+
+  if domain.is_empty() {
     print_usage()
     return
   }
@@ -276,244 +293,280 @@ async fn main {
   println("")
 
   // MTA-STS Check
-  print_subsection("MTA-STS (RFC 8461)")
   let mta_sts_result = @mta_sts.check(domain)
-  checks_total = checks_total + 1
   let mta_sts_valid = match mta_sts_result.record {
     Some(_) => true
     None => false
   }
-  println(
-    "    " + (if mta_sts_valid {
-      @lib.format_status(true)
-    } else {
-      @lib.yellow + "[SKIP]" + @lib.reset
-    }) + " MTA-STS",
-  )
-  match mta_sts_result.record {
-    Some(rec) => {
-      println("      Version: " + rec.version)
-      println("      Policy ID: " + rec.id)
+  if mta_sts_valid || show_all {
+    print_subsection("MTA-STS (RFC 8461)")
+    checks_total = checks_total + 1
+    println(
+      "    " + (if mta_sts_valid {
+        @lib.format_status(true)
+      } else {
+        @lib.yellow + "[SKIP]" + @lib.reset
+      }) + " MTA-STS",
+    )
+    match mta_sts_result.record {
+      Some(rec) => {
+        println("      Version: " + rec.version)
+        println("      Policy ID: " + rec.id)
+      }
+      None => ()
     }
-    None => ()
+    for err in mta_sts_result.errors {
+      println("      " + @lib.red + "Error: " + err + @lib.reset)
+      total_errors = total_errors + 1
+    }
+    if show_all {
+      for warn in mta_sts_result.warnings {
+        println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
+      }
+    }
+    if mta_sts_valid {
+      checks_passed = checks_passed + 1
+    }
+    println("")
   }
-  for err in mta_sts_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
-  }
-  for warn in mta_sts_result.warnings {
-    println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
-  }
-  if mta_sts_valid {
-    checks_passed = checks_passed + 1
-  }
-  println("")
 
   // TLS-RPT Check
-  print_subsection("TLS-RPT (RFC 8460)")
   let tlsrpt_result = @tlsrpt.check(domain)
-  checks_total = checks_total + 1
   let tlsrpt_valid = match tlsrpt_result.record {
     Some(_) => true
     None => false
   }
-  println(
-    "    " + (if tlsrpt_valid {
-      @lib.format_status(true)
-    } else {
-      @lib.yellow + "[SKIP]" + @lib.reset
-    }) + " TLS Reporting",
-  )
-  match tlsrpt_result.record {
-    Some(rec) => {
-      println("      Version: " + rec.version)
-      println("      Report URIs: " + rec.rua.length().to_string())
+  if tlsrpt_valid || show_all {
+    print_subsection("TLS-RPT (RFC 8460)")
+    checks_total = checks_total + 1
+    println(
+      "    " + (if tlsrpt_valid {
+        @lib.format_status(true)
+      } else {
+        @lib.yellow + "[SKIP]" + @lib.reset
+      }) + " TLS Reporting",
+    )
+    match tlsrpt_result.record {
+      Some(rec) => {
+        println("      Version: " + rec.version)
+        println("      Report URIs: " + rec.rua.length().to_string())
+      }
+      None => ()
     }
-    None => ()
+    for err in tlsrpt_result.errors {
+      println("      " + @lib.red + "Error: " + err + @lib.reset)
+      total_errors = total_errors + 1
+    }
+    if show_all {
+      for warn in tlsrpt_result.warnings {
+        println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
+      }
+    }
+    if tlsrpt_valid {
+      checks_passed = checks_passed + 1
+    }
+    println("")
   }
-  for err in tlsrpt_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
-  }
-  for warn in tlsrpt_result.warnings {
-    println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
-  }
-  if tlsrpt_valid {
-    checks_passed = checks_passed + 1
-  }
-  println("")
 
   // BIMI Check
-  print_subsection("BIMI")
   let bimi_result = @bimi.check(domain)
-  checks_total = checks_total + 1
   let bimi_valid = match bimi_result.record {
     Some(_) => true
     None => false
   }
-  println(
-    "    " + (if bimi_valid {
-      @lib.format_status(true)
-    } else {
-      @lib.yellow + "[SKIP]" + @lib.reset
-    }) + " Brand Logo",
-  )
-  match bimi_result.record {
-    Some(rec) => {
-      println("      Version: " + rec.version)
-      if not(rec.location.is_empty()) {
-        println("      Logo: " + rec.location)
+  if bimi_valid || show_all {
+    print_subsection("BIMI")
+    checks_total = checks_total + 1
+    println(
+      "    " + (if bimi_valid {
+        @lib.format_status(true)
+      } else {
+        @lib.yellow + "[SKIP]" + @lib.reset
+      }) + " Brand Logo",
+    )
+    match bimi_result.record {
+      Some(rec) => {
+        println("      Version: " + rec.version)
+        if not(rec.location.is_empty()) {
+          println("      Logo: " + rec.location)
+        }
+        if not(rec.authority.is_empty()) {
+          println("      VMC: " + rec.authority)
+        }
       }
-      if not(rec.authority.is_empty()) {
-        println("      VMC: " + rec.authority)
+      None => ()
+    }
+    for err in bimi_result.errors {
+      println("      " + @lib.red + "Error: " + err + @lib.reset)
+      total_errors = total_errors + 1
+    }
+    if show_all {
+      for warn in bimi_result.warnings {
+        println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
       }
     }
-    None => ()
+    if bimi_valid {
+      checks_passed = checks_passed + 1
+    }
+    println("")
   }
-  for err in bimi_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
-  }
-  for warn in bimi_result.warnings {
-    println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
-  }
-  if bimi_valid {
-    checks_passed = checks_passed + 1
-  }
-  println("")
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SECURITY RECORDS
   // ═══════════════════════════════════════════════════════════════════════════
-  print_section("Security Records")
-
   // CAA Check
-  print_subsection("CAA (RFC 8659)")
   let caa_result = @caa.check(domain)
-  checks_total = checks_total + 1
   let caa_has_records = caa_result.records.length() > 0
-  println(
-    "    " + (if caa_has_records {
-      @lib.format_status(true)
-    } else {
-      @lib.yellow + "[SKIP]" + @lib.reset
-    }) + " Certificate Authority Authorization",
-  )
-  for rec in caa_result.records {
-    println("      " + rec.tag + ": " + rec.value)
-  }
-  for err in caa_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
-  }
-  for warn in caa_result.warnings {
-    println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
-  }
-  if caa_has_records {
-    checks_passed = checks_passed + 1
-  }
-  println("")
 
   // TLSA/DANE Check
-  print_subsection("TLSA/DANE (RFC 6698)")
   let tlsa_result = @tlsa.check(domain)
-  checks_total = checks_total + 1
   let tlsa_has_records = tlsa_result.records.length() > 0
-  println(
-    "    " + (if tlsa_has_records {
-      @lib.format_status(true)
-    } else {
-      @lib.yellow + "[SKIP]" + @lib.reset
-    }) + " DANE for SMTP",
-  )
-  for rec in tlsa_result.records {
-    println(
-      "      Usage: " + @tlsa.usage_description(rec.usage) + " (" + rec.usage.to_string() + ")",
-    )
-    println(
-      "      Selector: " + @tlsa.selector_description(rec.selector) + " (" + rec.selector.to_string() + ")",
-    )
-    println(
-      "      Matching: " + @tlsa.matching_description(rec.matching_type) + " (" + rec.matching_type.to_string() + ")",
-    )
-  }
-  for err in tlsa_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
-  }
-  for warn in tlsa_result.warnings {
-    println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
-  }
-  if tlsa_has_records {
-    checks_passed = checks_passed + 1
-  }
-  println("")
 
   // DNSSEC Check
-  print_subsection("DNSSEC")
   let dnssec_result = @dnssec.check(domain)
-  checks_total = checks_total + 1
-  println(
-    "    " + (if dnssec_result.enabled {
-      @lib.format_status(true)
-    } else {
-      @lib.yellow + "[SKIP]" + @lib.reset
-    }) + " DNS Security Extensions",
-  )
-  if dnssec_result.enabled {
-    println("      DNSKEY records: " + dnssec_result.dnskey_records.length().to_string())
-    for rec in dnssec_result.dnskey_records {
-      let key_type = if rec.flags == 257 {
-        "KSK"
-      } else if rec.flags == 256 {
-        "ZSK"
-      } else {
-        "Unknown"
-      }
+
+  // Only show section if there are results or show_all
+  if caa_has_records || tlsa_has_records || dnssec_result.enabled || show_all {
+    print_section("Security Records")
+
+    if caa_has_records || show_all {
+      print_subsection("CAA (RFC 8659)")
+      checks_total = checks_total + 1
       println(
-        "        " + key_type + " (flags=" + rec.flags.to_string() + ", algo=" + @dnssec.algorithm_name(
-          rec.algorithm,
-        ) + ")",
+        "    " + (if caa_has_records {
+          @lib.format_status(true)
+        } else {
+          @lib.yellow + "[SKIP]" + @lib.reset
+        }) + " Certificate Authority Authorization",
       )
+      for rec in caa_result.records {
+        println("      " + rec.tag + ": " + rec.value)
+      }
+      for err in caa_result.errors {
+        println("      " + @lib.red + "Error: " + err + @lib.reset)
+        total_errors = total_errors + 1
+      }
+      if show_all {
+        for warn in caa_result.warnings {
+          println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
+        }
+      }
+      if caa_has_records {
+        checks_passed = checks_passed + 1
+      }
+      println("")
     }
-    if dnssec_result.ds_records.length() > 0 {
-      println("      DS records: " + dnssec_result.ds_records.length().to_string())
+
+    if tlsa_has_records || show_all {
+      print_subsection("TLSA/DANE (RFC 6698)")
+      checks_total = checks_total + 1
+      println(
+        "    " + (if tlsa_has_records {
+          @lib.format_status(true)
+        } else {
+          @lib.yellow + "[SKIP]" + @lib.reset
+        }) + " DANE for SMTP",
+      )
+      for rec in tlsa_result.records {
+        println(
+          "      Usage: " + @tlsa.usage_description(rec.usage) + " (" + rec.usage.to_string() + ")",
+        )
+        println(
+          "      Selector: " + @tlsa.selector_description(rec.selector) + " (" + rec.selector.to_string() + ")",
+        )
+        println(
+          "      Matching: " + @tlsa.matching_description(rec.matching_type) + " (" + rec.matching_type.to_string() + ")",
+        )
+      }
+      for err in tlsa_result.errors {
+        println("      " + @lib.red + "Error: " + err + @lib.reset)
+        total_errors = total_errors + 1
+      }
+      if show_all {
+        for warn in tlsa_result.warnings {
+          println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
+        }
+      }
+      if tlsa_has_records {
+        checks_passed = checks_passed + 1
+      }
+      println("")
+    }
+
+    if dnssec_result.enabled || show_all {
+      print_subsection("DNSSEC")
+      checks_total = checks_total + 1
+      println(
+        "    " + (if dnssec_result.enabled {
+          @lib.format_status(true)
+        } else {
+          @lib.yellow + "[SKIP]" + @lib.reset
+        }) + " DNS Security Extensions",
+      )
+      if dnssec_result.enabled {
+        println("      DNSKEY records: " + dnssec_result.dnskey_records.length().to_string())
+        for rec in dnssec_result.dnskey_records {
+          let key_type = if rec.flags == 257 {
+            "KSK"
+          } else if rec.flags == 256 {
+            "ZSK"
+          } else {
+            "Unknown"
+          }
+          println(
+            "        " + key_type + " (flags=" + rec.flags.to_string() + ", algo=" + @dnssec.algorithm_name(
+              rec.algorithm,
+            ) + ")",
+          )
+        }
+        if dnssec_result.ds_records.length() > 0 {
+          println("      DS records: " + dnssec_result.ds_records.length().to_string())
+        }
+      }
+      for err in dnssec_result.errors {
+        println("      " + @lib.red + "Error: " + err + @lib.reset)
+        total_errors = total_errors + 1
+      }
+      if show_all {
+        for warn in dnssec_result.warnings {
+          println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
+        }
+      }
+      if dnssec_result.enabled {
+        checks_passed = checks_passed + 1
+      }
+      println("")
     }
   }
-  for err in dnssec_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
-  }
-  for warn in dnssec_result.warnings {
-    println("      " + @lib.yellow + "Info: " + warn + @lib.reset)
-  }
-  if dnssec_result.enabled {
-    checks_passed = checks_passed + 1
-  }
-  println("")
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SERVICE RECORDS
   // ═══════════════════════════════════════════════════════════════════════════
-  print_section("Service Discovery (SRV)")
-
   let srv_results = @srv.check(domain)
   let mut srv_found = 0
   for result in srv_results {
     if result.records.length() > 0 {
       srv_found = srv_found + 1
-      println("  " + @lib.green + "✓" + @lib.reset + " " + result.service)
-      for rec in result.records {
-        println(
-          "      " + rec.priority.to_string() + " " + rec.weight.to_string() + " " + rec.port.to_string() + " " + rec.target,
-        )
-      }
     }
   }
-  if srv_found == 0 {
-    println("  " + @lib.yellow + "No SRV records found for common email services" + @lib.reset)
+
+  if srv_found > 0 || show_all {
+    print_section("Service Discovery (SRV)")
+    for result in srv_results {
+      if result.records.length() > 0 {
+        println("  " + @lib.green + "✓" + @lib.reset + " " + result.service)
+        for rec in result.records {
+          println(
+            "      " + rec.priority.to_string() + " " + rec.weight.to_string() + " " + rec.port.to_string() + " " + rec.target,
+          )
+        }
+      }
+    }
+    if srv_found == 0 && show_all {
+      println("  " + @lib.yellow + "No SRV records found for common email services" + @lib.reset)
+    }
+    println("")
   }
-  println("")
 
   // ═══════════════════════════════════════════════════════════════════════════
   // SUMMARY
