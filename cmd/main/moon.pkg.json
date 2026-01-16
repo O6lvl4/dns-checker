@@ -1,0 +1,10 @@
+{
+  "import": [
+    {
+      "path": "username/dns_checker",
+      "alias": "dns"
+    },
+    "moonbitlang/async"
+  ],
+  "is-main": true
+}
