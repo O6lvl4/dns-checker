@@ -33,6 +33,11 @@ pub fn format_status(valid : Bool) -> String {
   }
 }
 
+///| Format not found status (neutral - not an error)
+pub fn format_not_found() -> String {
+  yellow + "[--]" + reset
+}
+
 ///| Format warning status
 pub fn format_warning() -> String {
   yellow + bold + "[WARN]" + reset

@@ -127,7 +127,14 @@ async fn main {
   print_subsection("A/AAAA Records")
   let addr_result = @a.check(domain)
   checks_total = checks_total + 1
-  println("    " + @lib.format_status(addr_result.valid) + " Address Records")
+  let addr_status = if addr_result.valid {
+    @lib.format_status(true)
+  } else if addr_result.a_records.length() == 0 && addr_result.aaaa_records.length() == 0 {
+    @lib.format_not_found()
+  } else {
+    @lib.format_status(false)
+  }
+  println("    " + addr_status + " Address Records")
   if addr_result.a_records.length() > 0 {
     println("      IPv4:")
     for rec in addr_result.a_records {
@@ -140,13 +147,8 @@ async fn main {
       println("        " + rec.address)
     }
   }
-  for err in addr_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
-  }
-  for warn in addr_result.warnings {
-    println("      " + @lib.yellow + "Warning: " + warn + @lib.reset)
-    total_warnings = total_warnings + 1
+  if not(addr_result.valid) && addr_result.a_records.length() == 0 && addr_result.aaaa_records.length() == 0 {
+    println("      Not configured")
   }
   if addr_result.valid {
     checks_passed = checks_passed + 1
@@ -157,13 +159,19 @@ async fn main {
   print_subsection("NS Records")
   let ns_result = @ns.check(domain)
   checks_total = checks_total + 1
-  println("    " + @lib.format_status(ns_result.valid) + " Nameservers")
+  let ns_status = if ns_result.valid {
+    @lib.format_status(true)
+  } else if ns_result.records.length() == 0 {
+    @lib.format_not_found()
+  } else {
+    @lib.format_status(false)
+  }
+  println("    " + ns_status + " Nameservers")
   for rec in ns_result.records {
     println("      " + rec.nameserver)
   }
-  for err in ns_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
+  if not(ns_result.valid) && ns_result.records.length() == 0 {
+    println("      Not configured (inherits from parent domain)")
   }
   for warn in ns_result.warnings {
     println("      " + @lib.yellow + "Warning: " + warn + @lib.reset)
@@ -178,7 +186,15 @@ async fn main {
   print_subsection("SOA Record")
   let soa_result = @soa.check(domain)
   checks_total = checks_total + 1
-  println("    " + @lib.format_status(soa_result.valid) + " Zone Info")
+  let soa_status = if soa_result.valid {
+    @lib.format_status(true)
+  } else {
+    match soa_result.record {
+      Some(_) => @lib.format_status(false)
+      None => @lib.format_not_found()
+    }
+  }
+  println("    " + soa_status + " Zone Info")
   match soa_result.record {
     Some(rec) => {
       println("      Primary NS: " + rec.mname)
@@ -189,11 +205,7 @@ async fn main {
       println("      Expire: " + rec.expire.to_string() + "s")
       println("      Min TTL: " + rec.minimum.to_string() + "s")
     }
-    None => ()
-  }
-  for err in soa_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
+    None => println("      Not configured (inherits from parent domain)")
   }
   for warn in soa_result.warnings {
     println("      " + @lib.yellow + "Warning: " + warn + @lib.reset)
@@ -238,8 +250,8 @@ async fn main {
         }
       }
     } else {
-      println("    " + @lib.format_status(false) + " TXT Records")
-      println("      No TXT records found")
+      println("    " + @lib.format_not_found() + " TXT Records")
+      println("      Not configured")
     }
     println("")
   }
@@ -253,15 +265,27 @@ async fn main {
   print_subsection("MX Records")
   let mx_result = @mx.check(domain)
   checks_total = checks_total + 1
-  println("    " + @lib.format_status(mx_result.valid) + " Mail Servers")
+  let mx_status = if mx_result.valid {
+    @lib.format_status(true)
+  } else if mx_result.records.length() == 0 {
+    @lib.format_not_found()
+  } else {
+    @lib.format_status(false)
+  }
+  println("    " + mx_status + " Mail Servers")
   if mx_result.records.length() > 0 {
     for entry in mx_result.records {
       println("      " + entry.priority.to_string() + " " + entry.host)
     }
+  } else if not(mx_result.valid) {
+    println("      Not configured")
   }
+  // Only show errors for actual DNS failures, not for "no records"
   for err in mx_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
+    if not(err.has_prefix("No MX records")) {
+      println("      " + @lib.red + "Error: " + err + @lib.reset)
+      total_errors = total_errors + 1
+    }
   }
   for warn in mx_result.warnings {
     println("      " + @lib.yellow + "Warning: " + warn + @lib.reset)
@@ -276,17 +300,28 @@ async fn main {
   print_subsection("SPF (RFC 7208)")
   let spf_result = @spf.check(domain)
   checks_total = checks_total + 1
-  println("    " + @lib.format_status(spf_result.valid) + " SPF Record")
+  let spf_status = if spf_result.valid {
+    @lib.format_status(true)
+  } else {
+    match spf_result.record {
+      Some(_) => @lib.format_status(false)
+      None => @lib.format_not_found()
+    }
+  }
+  println("    " + spf_status + " SPF Record")
   match spf_result.record {
     Some(r) => {
       println("      Mechanisms: " + r.mechanisms.length().to_string())
       println("      DNS Lookups: " + spf_result.dns_lookup_count.to_string() + "/10")
     }
-    None => ()
+    None => println("      Not configured")
   }
+  // Only show errors for actual validation errors, not "No SPF record found"
   for err in spf_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
+    if not(err.has_prefix("No SPF record")) {
+      println("      " + @lib.red + "Error: " + err + @lib.reset)
+      total_errors = total_errors + 1
+    }
   }
   for warn in spf_result.warnings {
     println("      " + @lib.yellow + "Warning: " + warn + @lib.reset)
@@ -301,7 +336,15 @@ async fn main {
   print_subsection("DMARC (RFC 7489)")
   let dmarc_result = @dmarc.check(domain)
   checks_total = checks_total + 1
-  println("    " + @lib.format_status(dmarc_result.valid) + " DMARC Record")
+  let dmarc_status = if dmarc_result.valid {
+    @lib.format_status(true)
+  } else {
+    match dmarc_result.record {
+      Some(_) => @lib.format_status(false)
+      None => @lib.format_not_found()
+    }
+  }
+  println("    " + dmarc_status + " DMARC Record")
   match dmarc_result.record {
     Some(r) => {
       println("      Policy: " + r.policy.to_string())
@@ -312,11 +355,14 @@ async fn main {
         println("      Report URIs: " + r.rua.length().to_string())
       }
     }
-    None => ()
+    None => println("      Not configured")
   }
+  // Only show errors for actual validation errors, not "No DMARC record found"
   for err in dmarc_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
+    if not(err.has_prefix("No DMARC record")) {
+      println("      " + @lib.red + "Error: " + err + @lib.reset)
+      total_errors = total_errors + 1
+    }
   }
   for warn in dmarc_result.warnings {
     println("      " + @lib.yellow + "Warning: " + warn + @lib.reset)
@@ -335,9 +381,19 @@ async fn main {
     @dkim.check(domain)
   }
   checks_total = checks_total + 1
-  println("    " + @lib.format_status(dkim_result.valid) + " DKIM Records")
+  let dkim_status = if dkim_result.valid {
+    @lib.format_status(true)
+  } else if dkim_result.selectors_found == 0 {
+    @lib.format_not_found()
+  } else {
+    @lib.format_status(false)
+  }
+  println("    " + dkim_status + " DKIM Records")
   println("      Selectors checked: " + dkim_result.selectors_checked.to_string())
   println("      Selectors found: " + dkim_result.selectors_found.to_string())
+  if dkim_result.selectors_found == 0 {
+    println("      Not configured (or using non-standard selectors)")
+  }
   for r in dkim_result.results {
     match r.record {
       Some(rec) =>
@@ -347,7 +403,7 @@ async fn main {
       None =>
         if custom_dkim_selectors.length() > 0 {
           // Show not found for custom selectors
-          println("      " + @lib.red + "✗" + @lib.reset + " " + r.selector + " (not found)")
+          println("      " + @lib.yellow + "-" + @lib.reset + " " + r.selector + " (not found)")
         }
     }
     for err in r.errors {
@@ -359,9 +415,12 @@ async fn main {
       total_warnings = total_warnings + 1
     }
   }
+  // Only show errors for actual failures, not "No DKIM records found"
   for err in dkim_result.errors {
-    println("      " + @lib.red + "Error: " + err + @lib.reset)
-    total_errors = total_errors + 1
+    if not(err.has_prefix("No DKIM records")) {
+      println("      " + @lib.red + "Error: " + err + @lib.reset)
+      total_errors = total_errors + 1
+    }
   }
   if dkim_result.valid {
     checks_passed = checks_passed + 1
@@ -651,18 +710,42 @@ async fn main {
   println(@lib.bold + "Summary" + @lib.reset)
   println("═══════════════════════════════════════════════════════════════════════")
 
-  // Core checks summary
-  println("  " + @lib.bold + "Core Checks:" + @lib.reset)
-  println("    " + @lib.format_status(addr_result.valid) + " A/AAAA")
-  println("    " + @lib.format_status(ns_result.valid) + " NS")
-  println("    " + @lib.format_status(soa_result.valid) + " SOA")
-  if show_txt {
-    println("    " + @lib.format_status(txt_has_records) + " TXT")
+  // Core checks summary - helper for status display
+  fn summary_status(valid : Bool, not_found : Bool) -> String {
+    if valid {
+      @lib.format_status(true)
+    } else if not_found {
+      @lib.format_not_found()
+    } else {
+      @lib.format_status(false)
+    }
   }
-  println("    " + @lib.format_status(mx_result.valid) + " MX")
-  println("    " + @lib.format_status(spf_result.valid) + " SPF")
-  println("    " + @lib.format_status(dmarc_result.valid) + " DMARC")
-  println("    " + @lib.format_status(dkim_result.valid) + " DKIM")
+
+  println("  " + @lib.bold + "Core Checks:" + @lib.reset)
+  // A/AAAA: not found if no records
+  let addr_not_found = addr_result.a_records.length() == 0 && addr_result.aaaa_records.length() == 0
+  println("    " + summary_status(addr_result.valid, addr_not_found) + " A/AAAA")
+  // NS: not found if no records
+  let ns_not_found = ns_result.records.length() == 0
+  println("    " + summary_status(ns_result.valid, ns_not_found) + " NS")
+  // SOA: not found if no record
+  let soa_not_found = soa_result.record is None
+  println("    " + summary_status(soa_result.valid, soa_not_found) + " SOA")
+  if show_txt {
+    println("    " + summary_status(txt_has_records, not(txt_has_records)) + " TXT")
+  }
+  // MX: not found if no records
+  let mx_not_found = mx_result.records.length() == 0
+  println("    " + summary_status(mx_result.valid, mx_not_found) + " MX")
+  // SPF: not found if no record
+  let spf_not_found = spf_result.record is None
+  println("    " + summary_status(spf_result.valid, spf_not_found) + " SPF")
+  // DMARC: not found if no record
+  let dmarc_not_found = dmarc_result.record is None
+  println("    " + summary_status(dmarc_result.valid, dmarc_not_found) + " DMARC")
+  // DKIM: not found if no selectors found
+  let dkim_not_found = dkim_result.selectors_found == 0
+  println("    " + summary_status(dkim_result.valid, dkim_not_found) + " DKIM")
 
   // Show optional only if any are configured or show_all
   if mta_sts_valid || tlsrpt_valid || bimi_valid || caa_has_records || tlsa_has_records || dnssec_result.enabled || srv_found > 0 || show_all {
