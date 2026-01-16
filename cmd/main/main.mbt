@@ -205,10 +205,15 @@ async fn main {
   println("")
 
   // TXT Records (optional, shown with --txt flag)
+  let mut txt_has_records = false
   if show_txt {
     print_subsection("TXT Records")
     let txt_result = @dns.query_txt(domain)
+    checks_total = checks_total + 1
     if txt_result.success && txt_result.records.length() > 0 {
+      txt_has_records = true
+      checks_passed = checks_passed + 1
+      println("    " + @lib.format_status(true) + " TXT Records")
       for record in txt_result.records {
         let unquoted = unquote_txt(record)
         // Categorize the record
@@ -233,6 +238,7 @@ async fn main {
         }
       }
     } else {
+      println("    " + @lib.format_status(false) + " TXT Records")
       println("      No TXT records found")
     }
     println("")
@@ -647,39 +653,48 @@ async fn main {
 
   // Core checks summary
   println("  " + @lib.bold + "Core Checks:" + @lib.reset)
-  let core_checks = [
-    ("A/AAAA", addr_result.valid),
-    ("NS", ns_result.valid),
-    ("SOA", soa_result.valid),
-    ("MX", mx_result.valid),
-    ("SPF", spf_result.valid),
-    ("DMARC", dmarc_result.valid),
-    ("DKIM", dkim_result.valid),
-  ]
-
-  for check in core_checks {
-    let status = @lib.format_status(check.1)
-    println("    " + status + " " + check.0)
+  println("    " + @lib.format_status(addr_result.valid) + " A/AAAA")
+  println("    " + @lib.format_status(ns_result.valid) + " NS")
+  println("    " + @lib.format_status(soa_result.valid) + " SOA")
+  if show_txt {
+    println("    " + @lib.format_status(txt_has_records) + " TXT")
   }
+  println("    " + @lib.format_status(mx_result.valid) + " MX")
+  println("    " + @lib.format_status(spf_result.valid) + " SPF")
+  println("    " + @lib.format_status(dmarc_result.valid) + " DMARC")
+  println("    " + @lib.format_status(dkim_result.valid) + " DKIM")
 
-  println("")
-  println("  " + @lib.bold + "Optional/Enhanced:" + @lib.reset)
-  let optional_checks = [
-    ("MTA-STS", mta_sts_valid),
-    ("TLS-RPT", tlsrpt_valid),
-    ("BIMI", bimi_valid),
-    ("CAA", caa_has_records),
-    ("TLSA/DANE", tlsa_has_records),
-    ("DNSSEC", dnssec_result.enabled),
-  ]
-
-  for check in optional_checks {
-    let status = if check.1 {
-      @lib.green + "[OK]" + @lib.reset
-    } else {
-      @lib.yellow + "[--]" + @lib.reset
+  // Show optional only if any are configured or show_all
+  if mta_sts_valid || tlsrpt_valid || bimi_valid || caa_has_records || tlsa_has_records || dnssec_result.enabled || srv_found > 0 || show_all {
+    println("")
+    println("  " + @lib.bold + "Optional/Enhanced:" + @lib.reset)
+    if mta_sts_valid || show_all {
+      let status = if mta_sts_valid { @lib.green + "[OK]" + @lib.reset } else { @lib.yellow + "[--]" + @lib.reset }
+      println("    " + status + " MTA-STS")
     }
-    println("    " + status + " " + check.0)
+    if tlsrpt_valid || show_all {
+      let status = if tlsrpt_valid { @lib.green + "[OK]" + @lib.reset } else { @lib.yellow + "[--]" + @lib.reset }
+      println("    " + status + " TLS-RPT")
+    }
+    if bimi_valid || show_all {
+      let status = if bimi_valid { @lib.green + "[OK]" + @lib.reset } else { @lib.yellow + "[--]" + @lib.reset }
+      println("    " + status + " BIMI")
+    }
+    if caa_has_records || show_all {
+      let status = if caa_has_records { @lib.green + "[OK]" + @lib.reset } else { @lib.yellow + "[--]" + @lib.reset }
+      println("    " + status + " CAA")
+    }
+    if tlsa_has_records || show_all {
+      let status = if tlsa_has_records { @lib.green + "[OK]" + @lib.reset } else { @lib.yellow + "[--]" + @lib.reset }
+      println("    " + status + " TLSA/DANE")
+    }
+    if dnssec_result.enabled || show_all {
+      let status = if dnssec_result.enabled { @lib.green + "[OK]" + @lib.reset } else { @lib.yellow + "[--]" + @lib.reset }
+      println("    " + status + " DNSSEC")
+    }
+    if srv_found > 0 {
+      println("    " + @lib.green + "[OK]" + @lib.reset + " SRV (" + srv_found.to_string() + " services)")
+    }
   }
 
   println("")
