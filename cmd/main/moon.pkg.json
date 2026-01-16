@@ -5,6 +5,10 @@
       "alias": "lib"
     },
     {
+      "path": "username/dns_checker/src/dns",
+      "alias": "dns"
+    },
+    {
       "path": "username/dns_checker/src/a",
       "alias": "a"
     },

@@ -5,7 +5,14 @@ fn print_usage() -> Unit {
   println("Comprehensive DNS record checker (RFC compliant)")
   println("")
   println("Options:")
-  println("  --all, -a    Show all checks including unconfigured (SKIP)")
+  println("  --all, -a                Show all checks including unconfigured (SKIP)")
+  println("  --dkim-selector SEL      Add custom DKIM selector (can be used multiple times)")
+  println("  --txt                    Show all TXT records (domain verification, etc.)")
+  println("")
+  println("Examples:")
+  println("  dns-checker example.com")
+  println("  dns-checker example.com --dkim-selector selector1-azurecomm-prod-net")
+  println("  dns-checker example.com --txt")
   println("")
   println("Checks performed:")
   println("  Basic:")
@@ -53,6 +60,17 @@ fn print_subsection(title : String) -> Unit {
   println("  " + @lib.bold + title + @lib.reset)
 }
 
+///| Remove quotes from TXT record
+fn unquote_txt(s : String) -> String {
+  let result = StringBuilder::new()
+  for c in s {
+    if c != '"' {
+      result.write_char(c)
+    }
+  }
+  result.to_string()
+}
+
 ///|
 async fn main {
   let args = @env.args()
@@ -65,17 +83,27 @@ async fn main {
   // Parse arguments
   let mut domain = ""
   let mut show_all = false
-
-  for i in 1..<args.length() {
+  let mut show_txt = false
+  let custom_dkim_selectors : Array[String] = []
+  let mut i = 1
+  while i < args.length() {
     let arg = args[i]
     if arg == "--all" || arg == "-a" {
       show_all = true
+    } else if arg == "--txt" {
+      show_txt = true
+    } else if arg == "--dkim-selector" {
+      i = i + 1
+      if i < args.length() {
+        custom_dkim_selectors.push(args[i])
+      }
     } else if arg == "--help" || arg == "-h" {
       print_usage()
       return
     } else if domain.is_empty() {
       domain = arg
     }
+    i = i + 1
   }
 
   if domain.is_empty() {
@@ -176,6 +204,40 @@ async fn main {
   }
   println("")
 
+  // TXT Records (optional, shown with --txt flag)
+  if show_txt {
+    print_subsection("TXT Records")
+    let txt_result = @dns.query_txt(domain)
+    if txt_result.success && txt_result.records.length() > 0 {
+      for record in txt_result.records {
+        let unquoted = unquote_txt(record)
+        // Categorize the record
+        if unquoted.has_prefix("v=spf1") {
+          println("      " + @lib.green + "[SPF]" + @lib.reset + " " + unquoted)
+        } else if unquoted.has_prefix("ms-domain-verification") {
+          println("      " + @lib.blue + "[Microsoft]" + @lib.reset + " " + unquoted)
+        } else if unquoted.has_prefix("google-site-verification") {
+          println("      " + @lib.blue + "[Google]" + @lib.reset + " " + unquoted)
+        } else if unquoted.has_prefix("apple-domain-verification") {
+          println("      " + @lib.blue + "[Apple]" + @lib.reset + " " + unquoted)
+        } else if unquoted.has_prefix("facebook-domain-verification") {
+          println("      " + @lib.blue + "[Facebook]" + @lib.reset + " " + unquoted)
+        } else if unquoted.has_prefix("docusign") {
+          println("      " + @lib.blue + "[DocuSign]" + @lib.reset + " " + unquoted)
+        } else if unquoted.has_prefix("atlassian-domain-verification") {
+          println("      " + @lib.blue + "[Atlassian]" + @lib.reset + " " + unquoted)
+        } else if unquoted.has_prefix("_globalsign") {
+          println("      " + @lib.blue + "[GlobalSign]" + @lib.reset + " " + unquoted)
+        } else {
+          println("      " + @lib.yellow + "[TXT]" + @lib.reset + " " + unquoted)
+        }
+      }
+    } else {
+      println("      No TXT records found")
+    }
+    println("")
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // EMAIL RECORDS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -261,7 +323,11 @@ async fn main {
 
   // DKIM Check
   print_subsection("DKIM (RFC 6376)")
-  let dkim_result = @dkim.check(domain)
+  let dkim_result = if custom_dkim_selectors.length() > 0 {
+    @dkim.check_with_selectors(domain, custom_dkim_selectors)
+  } else {
+    @dkim.check(domain)
+  }
   checks_total = checks_total + 1
   println("    " + @lib.format_status(dkim_result.valid) + " DKIM Records")
   println("      Selectors checked: " + dkim_result.selectors_checked.to_string())
@@ -272,7 +338,11 @@ async fn main {
         println(
           "      " + @lib.green + "✓" + @lib.reset + " " + r.selector + " (" + rec.key_type.to_string() + ")",
         )
-      None => ()
+      None =>
+        if custom_dkim_selectors.length() > 0 {
+          // Show not found for custom selectors
+          println("      " + @lib.red + "✗" + @lib.reset + " " + r.selector + " (not found)")
+        }
     }
     for err in r.errors {
       println("        " + @lib.red + "Error: " + err + @lib.reset)

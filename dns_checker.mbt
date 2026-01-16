@@ -8,6 +8,8 @@
 pub let green : String = "\u001b[32m"
 pub let red : String = "\u001b[31m"
 pub let yellow : String = "\u001b[33m"
+pub let blue : String = "\u001b[34m"
+pub let cyan : String = "\u001b[36m"
 pub let reset : String = "\u001b[0m"
 pub let bold : String = "\u001b[1m"
 
