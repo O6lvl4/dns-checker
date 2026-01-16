@@ -5,6 +5,22 @@
       "alias": "lib"
     },
     {
+      "path": "username/dns_checker/src/a",
+      "alias": "a"
+    },
+    {
+      "path": "username/dns_checker/src/ns",
+      "alias": "ns"
+    },
+    {
+      "path": "username/dns_checker/src/soa",
+      "alias": "soa"
+    },
+    {
+      "path": "username/dns_checker/src/mx",
+      "alias": "mx"
+    },
+    {
       "path": "username/dns_checker/src/spf",
       "alias": "spf"
     },
@@ -17,8 +33,36 @@
       "alias": "dkim"
     },
     {
-      "path": "username/dns_checker/src/mx",
-      "alias": "mx"
+      "path": "username/dns_checker/src/mta_sts",
+      "alias": "mta_sts"
+    },
+    {
+      "path": "username/dns_checker/src/tlsrpt",
+      "alias": "tlsrpt"
+    },
+    {
+      "path": "username/dns_checker/src/bimi",
+      "alias": "bimi"
+    },
+    {
+      "path": "username/dns_checker/src/caa",
+      "alias": "caa"
+    },
+    {
+      "path": "username/dns_checker/src/tlsa",
+      "alias": "tlsa"
+    },
+    {
+      "path": "username/dns_checker/src/dnssec",
+      "alias": "dnssec"
+    },
+    {
+      "path": "username/dns_checker/src/srv",
+      "alias": "srv"
+    },
+    {
+      "path": "username/dns_checker/src/ptr",
+      "alias": "ptr"
     },
     "moonbitlang/async"
   ],

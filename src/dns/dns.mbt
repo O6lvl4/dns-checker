@@ -10,6 +10,11 @@ pub(all) enum RecordType {
   NS
   PTR
   SOA
+  CAA
+  SRV
+  TLSA
+  DNSKEY
+  DS
 }
 
 ///| Convert RecordType to dig query string
@@ -23,15 +28,20 @@ pub fn RecordType::to_query_string(self : RecordType) -> String {
     NS => "NS"
     PTR => "PTR"
     SOA => "SOA"
+    CAA => "CAA"
+    SRV => "SRV"
+    TLSA => "TLSA"
+    DNSKEY => "DNSKEY"
+    DS => "DS"
   }
 }
 
 ///| DNS Query Result
 pub(all) struct QueryResult {
-  pub success : Bool
-  pub records : Array[String]
-  pub raw_output : String
-  pub error : String
+  success : Bool
+  records : Array[String]
+  raw_output : String
+  error : String
 }
 
 ///| Create empty result
